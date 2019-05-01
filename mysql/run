@@ -1,0 +1,167 @@
+#!/bin/bash
+#----------------------------------------------------------------------------------------------------#
+# Build endplay core image and run it
+# Default endplay port 8080
+#----------------------------------------------------------------------------------------------------#
+# Endplay Default Configuration
+#----------------------------------------------------------------------------------------------------#
+IMAGE_NAME_1='image3'
+IMAGE_NAME_2='mysql_db'
+#----------------------------------------------------------------------------------------------------#
+# Postgres Default Configruation 
+#----------------------------------------------------------------------------------------------------#
+POSTGRES_PORT='5432'
+POSTGRES_IP='172.17.0.2'
+ENDPLAY_PORT='8080'
+#----------------------------------------------------------------------------------------------------#
+case "$1" in
+
+#----------------------------------------------------------------------------------------------------#
+# Pull Docker Image from Amazon
+#----------------------------------------------------------------------------------------------------#
+pull)
+    docker pull luzbetak.dkr.ecr.us-east-1.amazonaws.com/playground/eng:tag2    
+;;
+#----------------------------------------------------------------------------------------------------#
+# Build endplay image
+#----------------------------------------------------------------------------------------------------#
+build)
+    # docker build -t ${IMAGE_NAME_2} .
+    docker-compose up -d
+;;
+
+#----------------------------------------------------------------------------------------------------#
+# Create an Image
+#----------------------------------------------------------------------------------------------------#
+go)
+    parent1=$(pwd)
+    parent2="$(dirname "$parent1")"
+    CORE="$(dirname "$parent2")"
+    echo $CORE
+
+    set -x
+
+ 	docker run                          \
+        --detach                        \
+        --env JAVA_HOME=/usr/lib/jvm/java-1.7.0-openjdk-1.7.0.201-2.6.16.1.el7_6.x86_64/bin \
+        --publish ${ENDPLAY_PORT}:8080  \
+        --name ${IMAGE_NAME_1}            \
+        --tty --interactive             \
+        --workdir /root                 \
+        --mount type=bind,source=$HOME/.ivy2,target=/root/.ivy2,consistency=cache   \
+        --mount type=bind,source=$HOME/.m2,target=/root/.m2,consistency=cache       \
+        --mount type=bind,source=$HOME/.ant/,target=/root/.ant,consistency=cache    \
+        --mount type=bind,source=$HOME/.ssh,target=/root/.ssh,consistency=cache     \
+        ${IMAGE_NAME_1} /bin/sh -c "while true; do ping 8.8.8.8; sleep 9; done" 
+        
+        # docker run -d --name topdemo ${IMAGE_NAME_1} /usr/bin/top -b
+    set +x
+;;
+#----------------------------------------------------------------------------------------------------#
+go2)
+    set -x
+ 	docker run                          \
+        --detach                        \
+        --publish ${ENDPLAY_PORT}:8080  \
+        --name ${IMAGE_NAME_2}          \
+        --tty --interactive             \
+        --workdir /root                 \
+        ${IMAGE_NAME_2} /bin/sh -c "while true; do ping 8.8.8.8; sleep 9; done" 
+
+    set +x
+;;
+
+#----------------------------------------------------------------------------------------------------#
+# Run the container
+#----------------------------------------------------------------------------------------------------#
+bash)
+
+    docker exec -it ${IMAGE_NAME_2} /bin/bash 
+    ;;
+
+#----------------------------------------------------------------------------------------------------#
+# Test Postgres Database 
+#----------------------------------------------------------------------------------------------------#
+test)
+    psql -h ${POSTGRES_IP} -p ${POSTGRES_PORT} -P pager c4k -c "SELECT * FROM db1.student LIMIT 25;"
+;;
+
+#----------------------------------------------------------------------------------------------------#
+# Get ip if the container
+#----------------------------------------------------------------------------------------------------#
+ip)
+    docker exec -it ${IMAGE_NAME_1} /bin/hostname -I 
+;;    
+#----------------------------------------------------------------------------------------------------#
+# Start container
+#----------------------------------------------------------------------------------------------------#
+start)
+    if [ -z "$2" ]; then
+        echo "Container Argument Missing"
+        docker ps -a 
+    elif [ "$1" == "ps" ] 2>/dev/null; then
+        docker container start ${2}
+    fi
+;;
+#----------------------------------------------------------------------------------------------------#
+# Stop container 
+#----------------------------------------------------------------------------------------------------#
+stop)
+    if [ -z "$2" ]; then
+        echo "Container Argument Missing"
+        docker ps -a 
+    elif [ "$1" == "ps" ] 2>/dev/null; then
+        docker container stop ${2}
+    fi
+;;
+#----------------------------------------------------------------------------------------------------#
+# Stop all containers, delete all containers, images and volumes
+#----------------------------------------------------------------------------------------------------#
+delall)
+
+    echo "1/4 Stopping all containers"
+    docker stop $(docker ps -a -q)
+
+    echo "2/4 Removing all containers"
+    docker rm -f $(docker ps -a -q)
+
+    echo "3/4 Removing all images"
+    docker rmi -f $(docker images -q)
+
+    echo "4/4 Deleting All Volumes"
+    docker system prune --volumes --force
+;;
+#----------------------------------------------------------------------------------------------------#
+login)
+    aws ecr get-login > /tmp/login.sh 
+    perl -pe 's/-e none//g' /tmp/login.sh > login.sh
+    bash login.sh
+;;
+#----------------------------------------------------------------------------------------------------#
+# Display Menu
+#----------------------------------------------------------------------------------------------------#
+*)
+    echo "+----------------------------------------------------------------------------------+"
+    echo "|  ./run               -- Help for ENDPLAY CORE                                    |"
+    echo "+----------------------------------------------------------------------------------+"
+    echo "|  ./run build         -- docker build -t <image name> .                           |"
+    echo "|  ./run pull          -- pull image from repository                               |"
+    echo "|  ./run go            -- docker run --name <image name> -d centos /bin/sh         |"
+    echo "|  ./run bash          -- docker exec -it <container name> /bin/bash               |" 
+    echo "+----------------------------------------------------------------------------------+"
+    echo "|  ./run login         -- Login to Docker Repo                                     |" 
+    echo "|  ./run test          -- docker test database                                     |" 
+    echo "+----------------------------------------------------------------------------------+"
+    echo "|  ./run ip            -- docker exec -it <image name> /bin/hostname -I            |" 
+    echo "|  ./run start         -- docker container start <50e609c7d37c>                    |"
+    echo "|  ./run stop          -- stop all running containers                              |"
+    echo "|  ./run kill          -- kill all running containers                              |"
+    echo "|  ./run delete        -- delete all <containers or images>                        |"
+    echo "|  ./run delall        -- delete all containers and images                         |"
+    echo "+----------------------------------------------------------------------------------+"
+;;
+
+esac
+exit 0
+
+#----------------------------------------------------------------------------------------------------#

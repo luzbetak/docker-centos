@@ -1,0 +1,114 @@
+#!/bin/bash
+#--------------------------------------------------------------------------------------------#
+if [ -z "$1" ]; then
+    echo "+----------------------------------------------------------------------------------+"
+    echo "|  ./run           -- Help                                                         |"
+    echo "+----------------------------------------------------------------------------------+"
+    echo "|  ./run compose   -- docker-compose up -d                                         |"
+    echo "|  ./run bash      -- docker exec -it <container name> /bin/bash                   |" 
+    echo "|  ./run ip        -- docker exec -it postgresql_db_1 /bin/hostname -I             |" 
+    echo "+----------------------------------------------------------------------------------+"
+    echo "|  ./run psql      -- docker exec -it postgresql_db_1 /usr/bin/psql                |" 
+    echo "|  ./run query     -- select * from db1.student;                                   |" 
+    echo "|  ./run country   -- select * from db1.student;                                   |" 
+    echo "+----------------------------------------------------------------------------------+"
+    echo "|  ./run ps        -- docker ps  (-a -l)                                           |"
+    echo "|  ./run images    -- docker images                                                |"
+    echo "+----------------------------------------------------------------------------------+"
+    echo "|  ./run start     -- docker container start <50e609c7d37c>                        |"
+    echo "|  ./run stop      -- stop all running containers                                  |"
+    echo "|  ./run kill      -- kill all running containers                                  |"
+    echo "|  ./run delete    -- delete all <containers or images>                            |"
+    echo "|  ./run delall    -- delete all containers and images                             |"
+    echo "+----------------------------------------------------------------------------------+"
+
+#--------------------------------------------------------------------------------------------#
+elif [ "$1" == "compose" ] 2>/dev/null; then
+    docker-compose up -d
+
+#--------------------------------------------------------------------------------------------#
+elif [ "$1" == "country" ] 2>/dev/null; then
+    psql -U root -h 127.0.0.1 -p 5433 -P pager c4k -c "SELECT * FROM db1.student;"
+
+#--------------------------------------------------------------------------------------------#
+elif [ "$1" == "ip" ] 2>/dev/null; then
+    docker exec -it postgresql_db_1 /bin/hostname -I 
+
+#--------------------------------------------------------------------------------------------#
+elif [ "$1" == "psql" ] 2>/dev/null; then
+
+    docker exec -it postgresql_db_1 /usr/bin/psql
+
+#--------------------------------------------------------------------------------------------#
+# docker exec -it postgresql_db_1 /usr/bin/psql c4k -c \
+#      "SELECT table_catalog, table_schema, table_name, table_type \
+#           FROM information_schema.tables WHERE table_schema='lak_lpf';"
+#--------------------------------------------------------------------------------------------#
+elif [ "$1" == "query" ] 2>/dev/null; then
+  
+    # docker exec -it postgresql_db_1 /usr/bin/psql -c "SELECT table_name FROM information_schema.tables WHERE table_schema='c4k';"
+    if [ -z "$2" ]; then
+        # docker exec -it postgresql_db_1 /usr/bin/psql c4k -c "select * from db1.student;"
+        docker exec -it postgresql_db_1 /usr/bin/psql c4k -c "SELECT table_catalog, table_schema, table_name, table_type FROM information_schema.tables WHERE table_schema='lak_lpf';"
+    else
+        docker exec -it postgresql_db_1 /usr/bin/psql c4k -c "${2}"
+    fi
+
+
+#--------------------------------------------------------------------------------------------#
+elif [ "$1" == "bash" ] 2>/dev/null; then
+
+    if [ -z "$2" ]; then
+        echo "Container Argument Missing"
+        docker ps -a 
+    else
+        docker exec -it ${2} /bin/bash 
+    fi
+
+#--------------------------------------------------------------------------------------------#
+elif [ "$1" == "ps" ] 2>/dev/null; then
+    docker ps $2
+
+#--------------------------------------------------------------------------------------------#
+elif [ "$1" == "images" ] 2>/dev/null; then
+    docker images
+
+#--------------------------------------------------------------------------------------------#
+elif [ "$1" == "start" ] 2>/dev/null; then
+    if [ -z "$2" ]; then
+        echo "Container Argument Missing"
+        docker ps -a 
+    elif [ "$1" == "ps" ] 2>/dev/null; then
+        docker container start ${2}
+    fi
+#--------------------------------------------------------------------------------------------#
+elif [ "$1" == "stop" ] 2>/dev/null; then
+    docker stop $(docker ps -a -q) # stops all running containers    
+
+#--------------------------------------------------------------------------------------------#
+elif [ "$1" == "kill" ] 2>/dev/null; then
+    docker kill $(docker ps -q)
+
+#--------------------------------------------------------------------------------------------#
+elif [ "$1" == "delete" ] 2>/dev/null; then
+
+    if [ -z "$2" ]; then
+        echo "Provide delete containers or images"
+    
+    elif [ "$2" == "containers" ] 2>/dev/null; then
+        echo "Deleting all stopped containers " 
+        docker rm $(docker ps -a -q)
+    
+    elif [ "$2" == "images" ] 2>/dev/null; then
+        echo "Deleting all images" 
+        docker rmi $(docker images -q)
+    fi
+
+#--------------------------------------------------------------------------------------------#
+elif [ "$1" == "delall" ] 2>/dev/null; then
+
+      docker rm $(docker ps -a -q)
+      docker rmi $(docker images -q)
+fi
+#--------------------------------------------------------------------------------------------#
+
